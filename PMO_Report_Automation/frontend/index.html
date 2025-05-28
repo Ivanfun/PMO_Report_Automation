@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>PMO 報告自動化</title>
+    <style>
+        /* CSS 樣式直接內嵌在這裡 */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 40px;
+            background-color: #f0f2f5;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 80vh;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 35px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 90%;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2em;
+            font-weight: 600;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #555;
+            font-size: 1.1em;
+        }
+
+        input[type="file"] {
+            display: block;
+            width: calc(100% - 22px); /* 調整寬度以考慮 padding 和 border */
+            padding: 12px;
+            margin-bottom: 25px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            background-color: #f8f9fa;
+            font-size: 1em;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease-in-out;
+        }
+
+        input[type="file"]:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        input[type="submit"] {
+            background-color: #007bff;
+            color: white;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1em;
+            width: 100%;
+            box-sizing: border-box;
+            transition: background-color 0.3s ease;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+
+        .message {
+            margin-top: 25px;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 1em;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .info {
+            background-color: #e0f2f7;
+            color: #007bff;
+            border: 1px solid #b3e0ff;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #28a745;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #dc3545;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PMO 報告自動化</h1>
+        <form id="uploadForm" action="/process-files/" method="post" enctype="multipart/form-data">
+            <label for="word_template">上傳 Word 範本 (.docx):</label>
+            <input type="file" id="word_template" name="word_template" accept=".docx" required><br>
+
+            <label for="ppt_files">上傳多個 PPT 檔案 (.pptx):</label>
+            <input type="file" id="ppt_files" name="ppt_files" accept=".pptx" multiple required><br>
+
+            <input type="submit" value="產生報告">
+        </form>
+        <div id="message" class="message"></div>
+    </div>
+
+    <script>
+        // JavaScript 程式碼直接內嵌在這裡
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('uploadForm');
+            const messageDiv = document.getElementById('message');
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault(); // 阻止表單的預設提交行為
+
+                const formData = new FormData(form);
+                messageDiv.className = 'message info';
+                messageDiv.textContent = '正在處理檔案，請稍候...';
+
+                try {
+                    const response = await fetch('/process-files/', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+
+                        const contentDisposition = response.headers.get('Content-Disposition');
+                        let filename = 'PMO_合併報告.docx';
+                        if (contentDisposition) {
+                            const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                            if (filenameMatch && filenameMatch[1]) {
+                                filename = decodeURIComponent(filenameMatch[1]);
+                            }
+                        }
+
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+
+                        messageDiv.className = 'message success';
+                        messageDiv.textContent = '報告已成功產生並下載！';
+                    } else {
+                        const errorText = await response.text();
+                        messageDiv.className = 'message error';
+                        messageDiv.textContent = `處理失敗: ${errorText}`;
+                    }
+                } catch (error) {
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = `發生網路錯誤或應用程式錯誤: ${error.message}`;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+__pycache__/
+*.docx
+*.pptx
+backend/uploads/
+backend/output/
+.env

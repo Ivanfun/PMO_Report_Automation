@@ -11,12 +11,15 @@ import os
 
 # --- 輔助函式 ---
 
-# 清理非法字元
+# 清理非法字元，並增加將全形空格轉換為半形空格的處理
 def clean_text(text):
     if not isinstance(text, str):
         text = str(text)
     try:
+        # 移除控制字符和零寬度字符
         cleaned_text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\u200b\ufeff\u200c\u200d\u00ad]', '', text)
+        # 將全形空格轉換為半形空格
+        cleaned_text = cleaned_text.replace('\u3000', ' ')
         return cleaned_text
     except Exception as e:
         print(f"清理文字時發生錯誤: {e} - 原始文字 (前100字): {text[:100]}")
@@ -34,7 +37,7 @@ def set_run_fonts(run, ascii_font, east_asia_font, hansi_font):
         r_fonts.set(qn('w:eastAsia'), east_asia_font)
         r_fonts.set(qn('w:hAnsi'), hansi_font)
         rpr.append(r_fonts)
-        run.font.name = ascii_font
+        run.font.name = ascii_font # 再次設置 run.font.name 確保應用
     except Exception as e:
         print(f"設定文字區塊字型時發生錯誤: '{run.text[:50]}...'. 錯誤: {e}")
 
@@ -52,7 +55,7 @@ def set_doc_normal_font(doc):
         rFonts_element.set(qn('w:ascii'), 'Times New Roman')
         rFonts_element.set(qn('w:eastAsia'), '標楷體')
         rFonts_element.set(qn('w:hAnsi'), 'Times New Roman')
-        font.name = 'Times New Roman'
+        font.name = 'Times New Roman' # 再次設置 font.name 確保應用
         print("已成功設定 'Normal' 樣式的預設字型。")
     except Exception as e:
         print(f"警告: 無法設定 'Normal' 樣式的預設字型。錯誤: {e}")
@@ -64,7 +67,7 @@ def is_row_empty(row_data):
 
 # --- PPT 內容提取函式 ---
 
-# 從 PPT 中提取文字列表內容
+# 從 PPT 中提取文字列表內容 (如「本月概要」)
 def extract_text_list_from_ppt(ppt, start_keyword, stop_keywords=None):
     items = []
     is_capturing = False
@@ -72,7 +75,7 @@ def extract_text_list_from_ppt(ppt, start_keyword, stop_keywords=None):
         stop_keywords = []
 
     for slide in ppt.slides:
-        is_capturing = False
+        is_capturing_on_this_slide = False
         for shape in slide.shapes:
             if not shape.has_text_frame:
                 continue
@@ -84,26 +87,65 @@ def extract_text_list_from_ppt(ppt, start_keyword, stop_keywords=None):
                 if not line:
                     continue
 
-                if start_keyword in line and not is_capturing:
+                if start_keyword in line and not is_capturing_on_this_slide:
+                    is_capturing_on_this_slide = True
                     is_capturing = True
                     continue
 
-                if is_capturing:
+                if is_capturing_on_this_slide:
                     if any(kw in line for kw in stop_keywords):
-                        is_capturing = False
+                        is_capturing_on_this_slide = False
                         break
+                    
                     if line and line not in items:
                         items.append(line)
+        
+        if not is_capturing_on_this_slide and is_capturing:
+            break
     return items
 
 # 提取特定表格並將其內容結構化，同時處理專案階段表格的合併
 def extract_relevant_tables_from_ppt(ppt):
     extracted_tables_data = {
         "work_summary_table_data": None,
-        "project_stage_tables_data": []
+        "project_stage_tables_data": [],
+        "program_modifications_table_data": [],
+        "program_modifications_slide_indices": []
     }
 
-    for slide_idx, slide in enumerate(ppt.slides):
+    # 定義目標關鍵字列表
+    target_keywords = [
+        "修改因重跑過程發現的問題所產生的程式修改",
+        "修改項目" # 根據您的需求增加「修改項目」作為關鍵字
+    ]
+    # 將關鍵字標準化，用於比對
+    standardized_target_keywords = [clean_text(kw).replace(" ", "") for kw in target_keywords]
+
+    for slide_idx, slide in enumerate(ppt.slides): # slide_idx 從 0 開始
+        print(f"\n--- 正在檢查投影片 {slide_idx+1} ---")
+
+        # 提取整個投影片的文本內容進行關鍵字檢查
+        slide_full_text = ""
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                slide_full_text += clean_text(shape.text_frame.text) + "\n"
+        
+        # 標準化投影片的文本，移除空格進行更寬鬆的比對
+        standardized_slide_full_text = slide_full_text.replace(" ", "")
+
+        # 檢查關鍵字是否存在於整個投影片文本中
+        is_keyword_present_in_slide_anywhere = False
+        detected_keyword = None
+        for kw in standardized_target_keywords:
+            if kw in standardized_slide_full_text:
+                is_keyword_present_in_slide_anywhere = True
+                detected_keyword = kw # 記錄是哪個關鍵字被偵測到
+                print(f"  ✅ 投影片 {slide_idx+1} 的整體文本中偵測到關鍵字: '{kw}'")
+                break
+        
+        if not is_keyword_present_in_slide_anywhere:
+            print(f"  ❌ 投影片 {slide_idx+1} 的整體文本中未偵測到任何關鍵字。")
+
         for shape_idx, shape in enumerate(slide.shapes):
             if shape.has_table:
                 table = shape.table
@@ -115,34 +157,49 @@ def extract_relevant_tables_from_ppt(ppt):
                             cell_text = table.cell(r, c).text_frame.text.strip()
                             row_texts.append(clean_text(cell_text))
                         except Exception as e:
-                            print(f"處理投影片 {slide_idx+1}、形狀 {shape_idx+1} 中的單元格 ({r},{c}) 時發生錯誤: {e}")
+                            print(f"    處理投影片 {slide_idx+1}、形狀 {shape_idx+1} 中的單元格 ({r},{c}) 時發生錯誤: {e}")
                             row_texts.append("")
                     current_table_data.append(row_texts)
 
                 if not current_table_data:
+                    print(f"    形狀 {shape_idx+1} 中的表格為空，跳過。")
                     continue
 
                 first_cell_text = current_table_data[0][0].strip()
+                # 標準化表格第一格文本
+                standardized_first_cell_text = clean_text(first_cell_text).replace(" ", "")
+                print(f"    形狀 {shape_idx+1} 中的表格第一格內容: '{first_cell_text}'")
 
-                if (("工作總覽" in first_cell_text or "時間" in first_cell_text) and
+                # 識別「工作總覽」表格
+                if (("工作總覽" in standardized_first_cell_text or "時間" in standardized_first_cell_text) and
                         extracted_tables_data["work_summary_table_data"] is None):
                     extracted_tables_data["work_summary_table_data"] = current_table_data
                     print(f"    - 識別到 '工作總覽' 表格 (投影片 {slide_idx+1}, 形狀 {shape_idx+1})")
 
-                elif first_cell_text.startswith("專案階段"):
+                # 識別並合併「專案階段」表格
+                elif standardized_first_cell_text.startswith("專案階段"):
                     if extracted_tables_data["project_stage_tables_data"] and \
                        len(extracted_tables_data["project_stage_tables_data"][-1][0]) == len(current_table_data[0]):
-
-                        if len(current_table_data) >= 2:
-                             extracted_tables_data["project_stage_tables_data"][-1].extend(current_table_data[2:])
-                             print(f"    - 合併 '專案階段' 表格 (投影片 {slide_idx+1}, 形狀 {shape_idx+1})，並移除前兩行，到上一個表格")
+                        
+                        if len(current_table_data) >= 2 and \
+                           all(clean_text(current_table_data[1][c]).replace(" ", "") == clean_text(extracted_tables_data["project_stage_tables_data"][-1][1][c]).replace(" ", "") for c in range(len(current_table_data[1]))):
+                            extracted_tables_data["project_stage_tables_data"][-1].extend(current_table_data[2:])
+                            print(f"    - 合併 '專案階段' 表格 (投影片 {slide_idx+1}, 形狀 {shape_idx+1})，並移除前兩行，到上一個表格")
                         else:
-                             extracted_tables_data["project_stage_tables_data"][-1].extend(current_table_data[1:])
-                             print(f"    - 合併 '專案階段' 表格 (投影片 {slide_idx+1}, 形狀 {shape_idx+1})，並移除第一行，到上一個表格")
+                            extracted_tables_data["project_stage_tables_data"][-1].extend(current_table_data[1:])
+                            print(f"    - 合併 '專案階段' 表格 (投影片 {slide_idx+1}, 形狀 {shape_idx+1})，並移除第一行，到上一個表格")
                     else:
                         extracted_tables_data["project_stage_tables_data"].append(current_table_data)
                         print(f"    - 識別到新的 '專案階段' 表格 (投影片 {slide_idx+1}, 形狀 {shape_idx+1})")
 
+                # 識別「程式修改」表格（條件放寬：只要整頁有關鍵字，不再檢查表格第一欄，也不限第二頁）
+                elif is_keyword_present_in_slide_anywhere:
+                    extracted_tables_data["program_modifications_table_data"].append(current_table_data)
+                    extracted_tables_data["program_modifications_slide_indices"].append(slide_idx)
+                    print(f"    - 偵測到符合條件的 '程式修改' 表格 (投影片 {slide_idx+1}, 形狀 {shape_idx+1})。")
+
+                else:
+                    print(f"    - 形狀 {shape_idx+1} 中的表格不是目標表格類型。")
     return extracted_tables_data
 
 # 處理工作總覽表格數據，將其轉換為列表形式的關鍵字-值對
@@ -151,8 +208,9 @@ def process_work_summary_table(table_data):
     if table_data:
         full_table_content = []
         for row_texts in table_data:
-            if row_texts:
-                full_table_content.append(" ".join(row_texts))
+            if any(cell.strip() for cell in row_texts):
+                full_table_content.append(" ".join(row_texts).strip())
+
         combined_text = "\n".join(full_table_content)
 
         label_keywords = [
@@ -169,6 +227,7 @@ def process_work_summary_table(table_data):
             part = part.strip()
             if not part:
                 continue
+
             if part in label_keywords:
                 if current_label:
                     items.append(f"{current_label}{current_value.strip()}")
@@ -176,49 +235,34 @@ def process_work_summary_table(table_data):
                 current_value = ""
             else:
                 current_value += part + " "
+
         if current_label:
             items.append(f"{current_label}{current_value.strip()}")
         elif combined_text.strip() and not items:
             items.append(combined_text.strip())
+
     final_items = [item.strip() for item in items if item.strip()]
     return list(dict.fromkeys(final_items))
 
-# --- Word 內容生成函式 ---
-
 # 插入處理後的表格數據進 Word 並設定字型與欄寬、合併欄位與網底與換行支援
 def add_filtered_tables(doc, tables_data_list):
-    column_widths_cm = [1.24, 0.81, 0.81, 1.38, 4.69, 2.4, 2.4, 0.75, 2.27, 2.27]
+    predefined_widths_map = {
+        10: [Cm(1.24), Cm(0.81), Cm(0.81), Cm(1.38), Cm(4.69), Cm(2.56), Cm(2.25), Cm(0.75), Cm(2.25), Cm(2.29)],
+        2: [Cm(2), Cm(17.03)],
+    }
 
     for table_data in tables_data_list:
         if not table_data:
             continue
 
-        original_rows_count = len(table_data)
+        # 過濾空白行
         last_valid_row_idx = -1
         for r_idx in range(len(table_data) - 1, -1, -1):
             if not is_row_empty(table_data[r_idx]):
                 last_valid_row_idx = r_idx
                 break
 
-        if last_valid_row_idx == -1:
-            table_data_to_use = []
-        elif last_valid_row_idx < original_rows_count - 1:
-            content_last_valid_row_idx = -1
-            for r_idx in range(original_rows_count - 1, 0, -1):
-                if not is_row_empty(table_data[r_idx]):
-                    content_last_valid_row_idx = r_idx
-                    break
-
-            if original_rows_count > 0:
-                if content_last_valid_row_idx == -1:
-                    table_data_to_use = [table_data[0]]
-                else:
-                    table_data_to_use = table_data[:content_last_valid_row_idx + 1]
-            else:
-                table_data_to_use = []
-        else:
-            table_data_to_use = table_data
-
+        table_data_to_use = table_data[:last_valid_row_idx + 1] if last_valid_row_idx != -1 else []
         if not table_data_to_use:
             print("    - 檢測到表格為空或僅包含空白行，已跳過。")
             continue
@@ -229,19 +273,45 @@ def add_filtered_tables(doc, tables_data_list):
             print("    - 檢測到表格列數為零，已跳過。")
             continue
 
+        # 建立表格
         doc_table = doc.add_table(rows=rows, cols=cols)
         doc_table.style = "Table Grid"
+        doc_table.autofit = False
 
+        tbl = doc_table._tbl
+        tblPr = tbl.tblPr
+        if tblPr is None:
+            tblPr = OxmlElement('w:tblPr')
+            tbl.insert(0, tblPr)
+
+        tblW_existing = tblPr.find(qn('w:tblW'))
+        if tblW_existing is not None:
+            tblPr.remove(tblW_existing)
+
+        tblW = OxmlElement('w:tblW')
+        tblW.set(qn('w:type'), 'dxa')
+        tblW.set(qn('w:w'), str(int(19.03 * 567)))  # 11361 dxa
+        tblPr.append(tblW)
+
+        # 欄寬設定
+        if cols in predefined_widths_map:
+            current_column_widths_cm = predefined_widths_map[cols]
+            print(f"    - 為 {cols} 欄表格套用預設欄寬: {current_column_widths_cm}")
+        else:
+            col_width = Cm(19.03 / cols)
+            current_column_widths_cm = [col_width] * cols
+            print(f"    - 為 {cols} 欄表格平均分配欄寬: {col_width.cm:.2f} cm/欄")
+
+        # 寫入內容
         for r in range(rows):
             for c in range(cols):
                 cell_text = table_data_to_use[r][c] if c < len(table_data_to_use[r]) else ""
-
                 word_cell = doc_table.cell(r, c)
                 paragraph = word_cell.paragraphs[0]
                 paragraph.clear()
-
                 cleaned_text = clean_text(cell_text)
 
+                # 特殊換行處理（第4欄、第9~10欄）
                 if c == 4:
                     first_match = re.search(r'(\d+、)', cleaned_text)
                     if first_match:
@@ -252,53 +322,48 @@ def add_filtered_tables(doc, tables_data_list):
                     else:
                         formatted_text = cleaned_text
                     lines_to_add = formatted_text.splitlines()
+                elif c in [8, 9]:
+                    lines_to_add = cleaned_text.splitlines()
 
-                elif c == 8 or c == 9:
-                    original_lines = cleaned_text.splitlines()
-                    lines_to_add = []
-                    for idx, line in enumerate(original_lines):
-                        if line.strip():
-                            lines_to_add.append(line)
-                            if idx < len(original_lines) - 1:
-                                lines_to_add.append("")
                 else:
                     lines_to_add = cleaned_text.splitlines()
 
                 for idx, line in enumerate(lines_to_add):
-                    if not line.strip() and (c == 8 or c == 9):
-                        paragraph.add_run().add_break()
-                        paragraph.add_run().add_break()
-                    elif line.strip():
-                        if idx > 0 and (c != 8 and c != 9):
-                            paragraph.add_run().add_break()
-                        elif idx > 0 and (c == 8 or c == 9) and lines_to_add[idx-1].strip() != "":
-                            paragraph.add_run().add_break()
+                    if not line.strip():
+                        continue  # 跳過空行
 
+                    elif line.strip():
+                        if idx > 0 and (c not in [8, 9] or lines_to_add[idx-1].strip()):
+                            paragraph.add_run().add_break()
                         run = paragraph.add_run(line)
                         set_run_fonts(run, 'Times New Roman', '標楷體', 'Times New Roman')
                         run.font.size = Pt(12)
 
+                # 表頭網底
                 if r == 0:
                     tcPr = word_cell._tc.get_or_add_tcPr()
                     shd = OxmlElement('w:shd')
                     shd.set(qn('w:val'), 'clear')
                     shd.set(qn('w:color'), 'auto')
-                    shd.set(qn('w:fill'), 'D9D9D9')
+                    shd.set(qn('w:fill'), 'D9D9D9')  # 淺灰色
                     tcPr.append(shd)
 
-        for col_idx in [0, 8, 9]:
-            if col_idx < cols and rows > 1:
-                try:
-                    start_cell = doc_table.cell(1, col_idx)
-                    end_cell = doc_table.cell(rows - 1, col_idx)
-                    start_cell.merge(end_cell)
-                except Exception as e:
-                    print(f"無法合併表格第 {col_idx+1} 欄: {e}")
+        # 合併欄位（僅適用 10 欄的表格）
+        if cols == 10 and rows > 1:
+            for col_idx in [0, 8, 9]:
+                if col_idx < cols:
+                    try:
+                        doc_table.cell(1, col_idx).merge(doc_table.cell(rows - 1, col_idx))
+                    except Exception as e:
+                        print(f"無法合併表格第 {col_idx+1} 欄: {e}")
 
-        for i, width_cm in enumerate(column_widths_cm):
+        # 設定每一欄的寬度
+        for i, width_cm in enumerate(current_column_widths_cm):
             if i < cols:
                 for cell in doc_table.columns[i].cells:
-                    cell.width = Cm(width_cm)
+                    cell.width = width_cm
+
+
 
 # 插入 PPT 內容進 Word 文件中的動態會議區塊
 def insert_dynamic_meeting_section(doc, ppt_name, work_items, summary_items, add_page_break=False):

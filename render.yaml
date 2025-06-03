@@ -1,0 +1,12 @@
+# PMO_Report_Automation/render.yaml
+
+services:
+  - type: web
+    name: pmo-report-api
+    env: python
+    buildCommand: "" # 在部署到 Render 時，如果沒有其他特定構建步驟，保持為空
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port 10000 # 指定 Uvicorn 啟動命令和端口
+    plan: free # 免費方案，適合測試和小型應用
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11 # 指定 Python 版本

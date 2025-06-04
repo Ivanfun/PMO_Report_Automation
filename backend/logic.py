@@ -311,6 +311,7 @@ def add_filtered_tables(doc, tables_data_list):
                 paragraph.clear()
                 cleaned_text = clean_text(cell_text)
 
+
                 # 特殊換行處理（第4欄、第9~10欄）
                 if c == 4:
                     first_match = re.search(r'(\d+、)', cleaned_text)
@@ -322,20 +323,41 @@ def add_filtered_tables(doc, tables_data_list):
                     else:
                         formatted_text = cleaned_text
                     lines_to_add = formatted_text.splitlines()
-                elif c in [8, 9]:
-                    lines_to_add = cleaned_text.splitlines()
-
                 else:
                     lines_to_add = cleaned_text.splitlines()
 
-                for idx, line in enumerate(lines_to_add):
-                    if not line.strip():
-                        continue  # 跳過空行
-
-                    elif line.strip():
-                        if idx > 0 and (c not in [8, 9] or lines_to_add[idx-1].strip()):
+                # 第 9、10 欄特殊處理
+                if c in [8, 9]:
+                    if r == 0:
+                        for idx, line in enumerate(lines_to_add):
+                            if not line.strip():
+                                continue
+                            if idx > 0:
+                                paragraph.add_run().add_break()
+                            run = paragraph.add_run(line.strip())
+                            set_run_fonts(run, 'Times New Roman', '標楷體', 'Times New Roman')
+                            run.font.size = Pt(12)
+                    else:
+                        for idx, line in enumerate(lines_to_add):
+                            if not line.strip():
+                                continue
+                            if idx == 0:
+                                run = paragraph.add_run(line.strip())
+                                set_run_fonts(run, 'Times New Roman', '標楷體', 'Times New Roman')
+                                run.font.size = Pt(12)
+                            else:
+                                para = word_cell.add_paragraph()
+                                para.paragraph_format.space_before = Pt(12)
+                                run = para.add_run(line.strip())
+                                set_run_fonts(run, 'Times New Roman', '標楷體', 'Times New Roman')
+                                run.font.size = Pt(12)
+                else:
+                    for idx, line in enumerate(lines_to_add):
+                        if not line.strip():
+                            continue
+                        if idx > 0:
                             paragraph.add_run().add_break()
-                        run = paragraph.add_run(line)
+                        run = paragraph.add_run(line.strip())
                         set_run_fonts(run, 'Times New Roman', '標楷體', 'Times New Roman')
                         run.font.size = Pt(12)
 

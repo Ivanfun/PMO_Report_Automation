@@ -911,7 +911,11 @@
                 event.preventDefault();
 
                 if (!wordInput.files.length || !pptInput.files.length) {
-                    alert('請上傳 Word 範本與至少一個 PPT');
+                    errorMessage.textContent = '請上傳 Word 範本與至少一個 PPT';
+                    mainContainer.classList.add('hidden');
+                    processingView.classList.add('hidden');
+                    errorView.classList.remove('hidden');
+                    createErrorConfetti();
                     return;
                 }
 

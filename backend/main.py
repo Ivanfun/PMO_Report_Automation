@@ -59,6 +59,9 @@ async def process_files(
         doc = Document(word_template_stream)
         set_doc_normal_font(doc)
 
+        overall_has_work_items = False
+        overall_has_summary_items = False
+
         for i, ppt_file in enumerate(ppt_files):
             print(f"\n--- 正在處理第 {i+1}/{len(ppt_files)} 個 PPT 文件：{ppt_file.filename} ---")
             add_page_break = (i > 0)
@@ -79,8 +82,13 @@ async def process_files(
             work_summary_from_table = []
             if all_relevant_tables_data["work_summary_table_data"]:
                 work_summary_from_table = process_work_summary_table(all_relevant_tables_data["work_summary_table_data"])
+                if work_summary_from_table:
+                    overall_has_work_items = True
             else:
                 print("ℹ️ 未找到工作總覽表格。")
+
+            if monthly_summary_items:
+                overall_has_summary_items = True
 
             insert_dynamic_meeting_section(doc, ppt_file.filename, work_summary_from_table, monthly_summary_items, add_page_break)
             print("✅ 工作總覽與本月概要插入完成。")
@@ -106,6 +114,9 @@ async def process_files(
             print("💡 正在添加圖例和狀態說明...")
             add_legend_and_status(doc)
             print("✅ 圖例和狀態說明已添加。")
+
+        if not overall_has_work_items and not overall_has_summary_items:
+            raise HTTPException(status_code=400, detail="未找到工作總覽與本月概要的資料，無法產生報告")
 
         output_stream = io.BytesIO()
         doc.save(output_stream)

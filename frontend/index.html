@@ -1026,7 +1026,14 @@
                         body: formData,
                     });
 
-                    if (!response.ok) throw new Error("產生報告失敗，請稍後再試");
+                    if (!response.ok) {
+                        let msg = "產生報告失敗，請稍後再試";
+                        try {
+                            const data = await response.json();
+                            if (data.detail) msg = data.detail;
+                        } catch (e) {}
+                        throw new Error(msg);
+                    }
 
                     const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);

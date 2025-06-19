@@ -577,24 +577,29 @@
 
                 <div id="error-view" class="hidden">
                     <div class="text-center py-6">
-                        <div id="error-animation" class="mb-6">
+                        <div id="error-animation" class="mb-6 relative">
                             <div class="pulse-ring-error rounded-full h-24 w-24 flex items-center justify-center bg-red-100 mx-auto">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-red-600 animate__animated animate__bounceIn animate__shakeX animate__infinite" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-red-600 animate__animated animate__bounceIn" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </div>
                         </div>
-                        <h2 class="text-2xl font-bold text-gray-800 mb-2">報告產生失敗</h2>
-                        <p id="error-message" class="text-gray-600 mb-8"></p>
-                        <button id="retry-button" class="mt-8 text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center mx-auto">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                            </svg>
-                            再試一次
-                        </button>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-2 animate__animated animate__fadeInUp">報告產生失敗</h2>
+                        <p id="error-message" class="text-gray-600 mb-8 max-w-md mx-auto animate__animated animate__fadeInUp animate__delay-1s">
+                            報告產生過程中發生無法預期的錯誤。
+                        </p>
+                        <div class="animate__animated animate__fadeInUp animate__delay-2s">
+                             <button id="retry-button" class="mt-4 text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center mx-auto">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 9a9 9 0 0114.13-6.36M20 15a9 9 0 01-14.13 6.36" />
+                                </svg>
+                                返回並重試
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+                </div>
         </div>
         
         <div id="share-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden animate__animated animate__fadeIn">
@@ -1029,6 +1034,9 @@
             async function sendProcessingRequest() {
                 const formData = new FormData(form);
                 try {
+                    // MOCK ERROR: To test the error view, uncomment the following line
+                    // throw new Error("測試錯誤：上傳的範本檔案格式不符，請確認為 .docx 檔案。");
+
                     const response = await fetch("/process-files/", {
                         method: "POST",
                         body: formData,
@@ -1080,37 +1088,9 @@
             
             // Cancel processing
             cancelButton.addEventListener('click', () => {
-                processingView.classList.add('hidden');
-                mainContainer.classList.remove('hidden');
-                
-                // Reset step indicators
-                step1.classList.add('active');
-                step2.classList.remove('active', 'completed');
-                step3.classList.remove('active', 'completed');
-                progress12.style.width = '0%';
-                progress23.style.width = '0%';
-                
-                // Reset process steps
-                for (let i = 1; i <= 4; i++) {
-                    const stepElement = document.getElementById(`process-step-${i}`);
-                    const stepIcon = document.getElementById(`process-step-${i}-icon`);
-                    const stepStatus = document.getElementById(`process-step-${i}-status`);
-                    const stepBar = document.getElementById(`process-step-${i}-bar`);
-                    
-                    if (i > 1) stepElement.classList.add('opacity-50');
-                    stepIcon.innerHTML = '';
-                    stepStatus.textContent = '等待中';
-                    stepStatus.classList.remove('text-green-600');
-                    stepStatus.classList.add('text-gray-500');
-                    stepBar.classList.add('hidden');
-                    const progressBarInner = stepBar.querySelector('.bg-indigo-600');
-                    if (progressBarInner) progressBarInner.style.width = '0%';
-                }
-                
-                // Reset progress bar
-                progressBar.style.width = '0%';
-                progressPercentage.textContent = '0%';
-                statusMessage.textContent = '準備處理檔案...';
+                // This function should probably reload or reset the simulation state.
+                // For now, just go back to the main view.
+                window.location.reload(); // Simple solution
             });
             
             // Download button
@@ -1162,32 +1142,29 @@
             // Copy link button
             copyLink.addEventListener('click', () => {
                 const shareLink = document.getElementById('share-link');
-                shareLink.select();
-                document.execCommand('copy');
-                
-                // Show copied feedback
-                const originalHTML = copyLink.innerHTML;
-                copyLink.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                `;
-                
-                setTimeout(() => {
-                    copyLink.innerHTML = originalHTML;
-                }, 2000);
+                navigator.clipboard.writeText(shareLink.value).then(() => {
+                    // Show copied feedback
+                    const originalHTML = copyLink.innerHTML;
+                    copyLink.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    `;
+                    
+                    setTimeout(() => {
+                        copyLink.innerHTML = originalHTML;
+                    }, 2000);
+                });
             });
             
-            // New report button
-            newReportButton.addEventListener('click', () => {
-                // Reset form
+            function resetToInitialState() {
                 form.reset();
                 wordFileInfo.classList.add('hidden');
                 pptFilesContainer.classList.add('hidden');
+                pptFilesList.innerHTML = '';
                 wordDropArea.classList.remove('border-indigo-300', 'bg-indigo-50');
                 pptDropArea.classList.remove('border-orange-300', 'bg-orange-50');
                 
-                // Reset step indicators
                 step1.classList.add('active');
                 step1.classList.remove('completed');
                 step2.classList.remove('active', 'completed');
@@ -1195,18 +1172,19 @@
                 progress12.style.width = '0%';
                 progress23.style.width = '0%';
                 
-                // Show main container
                 resultView.classList.add('hidden');
+                errorView.classList.add('hidden');
                 mainContainer.classList.remove('hidden');
 
-                // Reset process steps to initial state
+                // Reset processing view details
                 for (let i = 1; i <= 4; i++) {
                     const stepElement = document.getElementById(`process-step-${i}`);
                     const stepIcon = document.getElementById(`process-step-${i}-icon`);
                     const stepStatus = document.getElementById(`process-step-${i}-status`);
                     const stepBar = document.getElementById(`process-step-${i}-bar`);
                     
-                    if (i > 1) stepElement.classList.add('opacity-50');
+                    stepElement.classList.add('opacity-50');
+                    if (i === 1) stepElement.classList.remove('opacity-50');
                     stepIcon.innerHTML = '';
                     stepStatus.textContent = '等待中';
                     stepStatus.classList.remove('text-green-600');
@@ -1215,84 +1193,52 @@
                     const progressBarInner = stepBar.querySelector('.bg-indigo-600');
                     if (progressBarInner) progressBarInner.style.width = '0%';
                 }
-                 // Reset overall progress bar
+                 
                 progressBar.style.width = '0%';
                 progressPercentage.textContent = '0%';
                 statusMessage.textContent = '準備處理檔案...';
-            });
+            }
+
+            // New report button
+            newReportButton.addEventListener('click', resetToInitialState);
 
             // Retry button in error view
-            retryButton.addEventListener('click', () => {
-                // Reset form
-                form.reset();
-                wordFileInfo.classList.add('hidden');
-                pptFilesContainer.classList.add('hidden');
-                wordDropArea.classList.remove('border-indigo-300', 'bg-indigo-50');
-                pptDropArea.classList.remove('border-orange-300', 'bg-orange-50');
-
-                // Reset step indicators
-                step1.classList.add('active');
-                step1.classList.remove('completed');
-                step2.classList.remove('active', 'completed');
-                step3.classList.remove('active', 'completed');
-                progress12.style.width = '0%';
-                progress23.style.width = '0%';
-
-                // Show main container
-                errorView.classList.add('hidden');
-                mainContainer.classList.remove('hidden');
-
-                // Reset process steps to initial state
-                for (let i = 1; i <= 4; i++) {
-                    const stepElement = document.getElementById(`process-step-${i}`);
-                    const stepIcon = document.getElementById(`process-step-${i}-icon`);
-                    const stepStatus = document.getElementById(`process-step-${i}-status`);
-                    const stepBar = document.getElementById(`process-step-${i}-bar`);
-
-                    if (i > 1) stepElement.classList.add('opacity-50');
-                    stepIcon.innerHTML = '';
-                    stepStatus.textContent = '等待中';
-                    stepStatus.classList.remove('text-green-600');
-                    stepStatus.classList.add('text-gray-500');
-                    stepBar.classList.add('hidden');
-                    const progressBarInner = stepBar.querySelector('.bg-indigo-600');
-                    if (progressBarInner) progressBarInner.style.width = '0%';
-                }
-
-                progressBar.style.width = '0%';
-                progressPercentage.textContent = '0%';
-                statusMessage.textContent = '準備處理檔案...';
-            });
+            retryButton.addEventListener('click', resetToInitialState);
             
             // Confetti animation
             function createConfetti() {
                 const confettiContainer = document.getElementById('success-animation');
+                if (!confettiContainer) return;
                 const colors = ['#4f46e5', '#10b981', '#f97316', '#ef4444', '#3b82f6', '#ec4899'];
                 const confettiCount = 100;
                 
                 for (let i = 0; i < confettiCount; i++) {
                     const confetti = document.createElement('div');
                     confetti.className = 'confetti';
+                    confetti.style.position = 'absolute';
                     confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                    confetti.style.left = Math.random() * 100 + '%';
-                    confetti.style.top = (Math.random() * 20 - 10) + '%';
+                    confetti.style.left = '50%';
+                    confetti.style.top = '50%';
                     confetti.style.width = Math.random() * 8 + 6 + 'px';
                     confetti.style.height = Math.random() * 4 + 4 + 'px';
-                    confetti.style.opacity = Math.random() + 0.5;
-                    confetti.style.transform = 'rotate(' + Math.random() * 360 + 'deg)';
+                    confetti.style.opacity = '1';
                     
                     confettiContainer.appendChild(confetti);
                     
-                    // Animate confetti
+                    const angle = Math.random() * 2 * Math.PI;
+                    const distance = Math.random() * 150 + 50;
+                    const x = Math.cos(angle) * distance;
+                    const y = Math.sin(angle) * distance;
+
                     const animation = confetti.animate(
                         [
                             { transform: `translate(0, 0) rotate(0deg)`, opacity: 1 },
-                            { transform: `translate(${Math.random() * 200 - 100}px, ${Math.random() * 200 + 100}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+                            { transform: `translate(${x}px, ${y + 50}px) rotate(720deg)`, opacity: 0 }
                         ],
                         {
                             duration: Math.random() * 2000 + 1500,
-                            easing: 'cubic-bezier(0, .9, .57, 1)',
-                            delay: Math.random() * 1000
+                            easing: 'cubic-bezier(0.1, 0.9, 0.9, 0.1)',
+                            delay: Math.random() * 200
                         }
                     );
                     
@@ -1302,28 +1248,35 @@
 
             function createErrorConfetti() {
                 const container = document.getElementById('error-animation');
-                const colors = ['#ef4444', '#f87171', '#fee2e2'];
+                if (!container) return;
                 const count = 80;
 
                 for (let i = 0; i < count; i++) {
                     const piece = document.createElement('div');
-                    piece.className = 'error-confetti';
-                    piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                    piece.style.left = Math.random() * 100 + '%';
-                    piece.style.top = (Math.random() * 20 - 10) + '%';
-                    piece.style.transform = 'rotate(' + Math.random() * 360 + 'deg)';
-
+                    piece.style.position = 'absolute';
+                    piece.style.width = `${Math.random() * 8 + 5}px`;
+                    piece.style.height = piece.style.width;
+                    piece.style.backgroundColor = `hsl(0, 80%, ${Math.random() * 20 + 60}%)`;
+                    piece.style.borderRadius = '50%';
+                    piece.style.left = '50%';
+                    piece.style.top = '50%';
+                    
                     container.appendChild(piece);
+
+                    const angle = Math.random() * 2 * Math.PI;
+                    const distance = Math.random() * 120 + 40;
+                    const x = Math.cos(angle) * distance;
+                    const y = Math.sin(angle) * distance;
 
                     const animation = piece.animate(
                         [
-                            { transform: `translate(0, 0) rotate(0deg)`, opacity: 1 },
-                            { transform: `translate(${Math.random() * 150 - 75}px, ${Math.random() * 150 + 80}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+                            { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+                            { transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(0)`, opacity: 0 }
                         ],
                         {
                             duration: Math.random() * 1500 + 1200,
-                            easing: 'cubic-bezier(0, .9, .57, 1)',
-                            delay: Math.random() * 800
+                            easing: 'cubic-bezier(0.1, 0.9, 0.9, 0.1)',
+                            delay: Math.random() * 200
                         }
                     );
 

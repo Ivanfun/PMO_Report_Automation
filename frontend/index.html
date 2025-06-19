@@ -194,6 +194,22 @@
             box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7);
             animation: pulse-ring 2s infinite;
         }
+
+        .pulse-ring-error {
+            position: relative;
+        }
+
+        .pulse-ring-error::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            animation: pulse-ring 2s infinite;
+        }
         
         @keyframes pulse-ring {
             0% {
@@ -550,6 +566,26 @@
                         </button>
                     </div>
                 </div>
+
+                <div id="error-view" class="hidden">
+                    <div class="text-center py-6">
+                        <div class="mb-6">
+                            <div class="pulse-ring-error rounded-full h-24 w-24 flex items-center justify-center bg-red-100 mx-auto">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-red-600 animate__animated animate__bounceIn" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-2">報告產生失敗</h2>
+                        <p id="error-message" class="text-gray-600 mb-8"></p>
+                        <button id="retry-button" class="mt-8 text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center mx-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                            再試一次
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -659,6 +695,9 @@
             const downloadButton = document.getElementById('download-button');
             const shareButton = document.getElementById('share-button');
             const newReportButton = document.getElementById('new-report-button');
+            const errorView = document.getElementById('error-view');
+            const errorMessage = document.getElementById('error-message');
+            const retryButton = document.getElementById('retry-button');
             const shareModal = document.getElementById('share-modal');
             const closeModal = document.getElementById('close-modal');
             const copyLink = document.getElementById('copy-link');
@@ -1017,36 +1056,9 @@
                     createConfetti();
 
                 } catch (error) {
-                    alert(error.message || "報告產生過程中發生錯誤");
-
-                    // 回復狀態
                     processingView.classList.add('hidden');
-                    mainContainer.classList.remove('hidden');
-                    step1.classList.add('active');
-                    step2.classList.remove('active', 'completed');
-                    step3.classList.remove('active', 'completed');
-                    progress12.style.width = '0%';
-                    progress23.style.width = '0%';
-                     // Reset process steps on error
-                    for (let i = 1; i <= 4; i++) {
-                        const stepElement = document.getElementById(`process-step-${i}`);
-                        const stepIcon = document.getElementById(`process-step-${i}-icon`);
-                        const stepStatus = document.getElementById(`process-step-${i}-status`);
-                        const stepBar = document.getElementById(`process-step-${i}-bar`);
-                        
-                        if (i > 1) stepElement.classList.add('opacity-50');
-                        stepIcon.innerHTML = '';
-                        stepStatus.textContent = '等待中';
-                        stepStatus.classList.remove('text-green-600');
-                        stepStatus.classList.add('text-gray-500');
-                        stepBar.classList.add('hidden');
-                        const progressBarInner = stepBar.querySelector('.bg-indigo-600');
-                        if (progressBarInner) progressBarInner.style.width = '0%';
-                    }
-                     // Reset overall progress bar
-                    progressBar.style.width = '0%';
-                    progressPercentage.textContent = '0%';
-                    statusMessage.textContent = '準備處理檔案...';
+                    errorMessage.textContent = error.message || '報告產生過程中發生錯誤';
+                    errorView.classList.remove('hidden');
                 }
             }
             
@@ -1188,6 +1200,49 @@
                     if (progressBarInner) progressBarInner.style.width = '0%';
                 }
                  // Reset overall progress bar
+                progressBar.style.width = '0%';
+                progressPercentage.textContent = '0%';
+                statusMessage.textContent = '準備處理檔案...';
+            });
+
+            // Retry button in error view
+            retryButton.addEventListener('click', () => {
+                // Reset form
+                form.reset();
+                wordFileInfo.classList.add('hidden');
+                pptFilesContainer.classList.add('hidden');
+                wordDropArea.classList.remove('border-indigo-300', 'bg-indigo-50');
+                pptDropArea.classList.remove('border-orange-300', 'bg-orange-50');
+
+                // Reset step indicators
+                step1.classList.add('active');
+                step1.classList.remove('completed');
+                step2.classList.remove('active', 'completed');
+                step3.classList.remove('active', 'completed');
+                progress12.style.width = '0%';
+                progress23.style.width = '0%';
+
+                // Show main container
+                errorView.classList.add('hidden');
+                mainContainer.classList.remove('hidden');
+
+                // Reset process steps to initial state
+                for (let i = 1; i <= 4; i++) {
+                    const stepElement = document.getElementById(`process-step-${i}`);
+                    const stepIcon = document.getElementById(`process-step-${i}-icon`);
+                    const stepStatus = document.getElementById(`process-step-${i}-status`);
+                    const stepBar = document.getElementById(`process-step-${i}-bar`);
+
+                    if (i > 1) stepElement.classList.add('opacity-50');
+                    stepIcon.innerHTML = '';
+                    stepStatus.textContent = '等待中';
+                    stepStatus.classList.remove('text-green-600');
+                    stepStatus.classList.add('text-gray-500');
+                    stepBar.classList.add('hidden');
+                    const progressBarInner = stepBar.querySelector('.bg-indigo-600');
+                    if (progressBarInner) progressBarInner.style.width = '0%';
+                }
+
                 progressBar.style.width = '0%';
                 progressPercentage.textContent = '0%';
                 statusMessage.textContent = '準備處理檔案...';

@@ -249,6 +249,14 @@
             background-color: #f00;
             opacity: 0;
         }
+
+        .error-confetti {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: var(--error);
+            opacity: 0;
+        }
     </style>
 </head>
 <body class="py-8 px-4">
@@ -569,9 +577,9 @@
 
                 <div id="error-view" class="hidden">
                     <div class="text-center py-6">
-                        <div class="mb-6">
+                        <div id="error-animation" class="mb-6">
                             <div class="pulse-ring-error rounded-full h-24 w-24 flex items-center justify-center bg-red-100 mx-auto">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-red-600 animate__animated animate__bounceIn" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-red-600 animate__animated animate__bounceIn animate__shakeX animate__infinite" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </div>
@@ -1066,6 +1074,7 @@
                     processingView.classList.add('hidden');
                     errorMessage.textContent = error.message || '報告產生過程中發生錯誤';
                     errorView.classList.remove('hidden');
+                    createErrorConfetti();
                 }
             }
             
@@ -1288,6 +1297,37 @@
                     );
                     
                     animation.onfinish = () => confetti.remove();
+                }
+            }
+
+            function createErrorConfetti() {
+                const container = document.getElementById('error-animation');
+                const colors = ['#ef4444', '#f87171', '#fee2e2'];
+                const count = 80;
+
+                for (let i = 0; i < count; i++) {
+                    const piece = document.createElement('div');
+                    piece.className = 'error-confetti';
+                    piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    piece.style.left = Math.random() * 100 + '%';
+                    piece.style.top = (Math.random() * 20 - 10) + '%';
+                    piece.style.transform = 'rotate(' + Math.random() * 360 + 'deg)';
+
+                    container.appendChild(piece);
+
+                    const animation = piece.animate(
+                        [
+                            { transform: `translate(0, 0) rotate(0deg)`, opacity: 1 },
+                            { transform: `translate(${Math.random() * 150 - 75}px, ${Math.random() * 150 + 80}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+                        ],
+                        {
+                            duration: Math.random() * 1500 + 1200,
+                            easing: 'cubic-bezier(0, .9, .57, 1)',
+                            delay: Math.random() * 800
+                        }
+                    );
+
+                    animation.onfinish = () => piece.remove();
                 }
             }
         });

@@ -3,4 +3,4 @@ uvicorn
 python-multipart
 python-docx
 python-pptx
-jinja2
+
